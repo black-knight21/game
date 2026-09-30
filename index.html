@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Our Little Home</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Nunito:wght@500;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #1c1030;
+    --card: #2b1948;
+    --line: #4a2d7a;
+    --text: #f0e6ff;
+    --mute: #b9a5dd;
+    --pink: #ff6fa8;
+    --violet: #a66bff;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  body {
+    margin: 0; min-height: 100vh;
+    background: radial-gradient(900px 500px at 50% -10%, #3d1868 0%, var(--bg) 65%) fixed, var(--bg);
+    color: var(--text); font-family: "Nunito", system-ui, sans-serif; line-height: 1.45;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 12px 12px 28px; }
+  .hud { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .title { font-family: "Press Start 2P", monospace; font-size: 13px; color: var(--pink); }
+  .stats { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .pill { background: var(--card); border: 2px solid var(--line); border-radius: 999px; padding: 4px 12px; font-weight: 800; }
+  .bar { position: relative; width: 96px; height: 22px; background: var(--card); border: 2px solid var(--line); border-radius: 999px; overflow: hidden; }
+  .bar i { position: absolute; inset: 0 auto 0 0; width: 50%; background: linear-gradient(90deg, var(--violet), var(--pink)); transition: width .4s; }
+  .bar b { position: absolute; left: 6px; top: 50%; transform: translateY(-50%); font-size: 12px; }
+  .screen { position: relative; }
+  canvas {
+    display: block; width: 100%; aspect-ratio: 3 / 2; background: #000;
+    border: 4px solid var(--line); border-radius: 10px;
+    image-rendering: pixelated; image-rendering: crisp-edges;
+  }
+  .toast {
+    position: absolute; left: 50%; top: 10px; transform: translateX(-50%); max-width: 90%;
+    background: rgba(20, 8, 36, .92); border: 2px solid var(--pink); border-radius: 10px;
+    padding: 8px 14px; font-weight: 700; font-size: 14px; text-align: center; pointer-events: none;
+    opacity: 0; transition: opacity .25s;
+  }
+  .toast.show { opacity: 1; }
+  .menu { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .btn {
+    all: unset; box-sizing: border-box; cursor: pointer; text-align: center;
+    background: linear-gradient(180deg, var(--pink), #e04b8a); color: #fff; font-weight: 800;
+    padding: 10px 16px; border-radius: 10px; border-bottom: 3px solid #a82e62; user-select: none;
+  }
+  .btn:active { transform: translateY(2px); border-bottom-width: 1px; }
+  .btn:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+  .btn.ghost { background: var(--card); border: 2px solid var(--line); border-bottom-width: 3px; color: var(--text); }
+  .btn[disabled], .btn.off { opacity: .45; cursor: not-allowed; }
+  .menu .btn { flex: 1 1 auto; position: relative; }
+  .badge { position: absolute; top: -6px; right: -6px; background: #ffd23f; color: #3a2358; border-radius: 99px; font-size: 11px; padding: 1px 7px; }
+  .hint { color: var(--mute); font-size: 13px; margin: 8px 2px 0; }
+  .pad { display: none; margin-top: 12px; justify-content: space-between; align-items: center; }
+  .pad.on { display: flex; }
+  .dpad { display: grid; grid-template-columns: repeat(3, 56px); grid-template-rows: repeat(3, 56px); gap: 4px; touch-action: none; }
+  .dpad button, .abtn {
+    all: unset; box-sizing: border-box; background: var(--card); border: 2px solid var(--line); border-radius: 14px;
+    display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 800; touch-action: none; user-select: none;
+  }
+  .dpad button:active, .abtn:active { background: var(--violet); }
+  .dpad .u { grid-column: 2; grid-row: 1; } .dpad .l { grid-column: 1; grid-row: 2; }
+  .dpad .r { grid-column: 3; grid-row: 2; } .dpad .d { grid-column: 2; grid-row: 3; }
+  .abtn { width: 84px; height: 84px; border-radius: 50%; background: linear-gradient(180deg, var(--pink), #e04b8a); font-size: 26px; }
+
+  .overlay { position: fixed; inset: 0; background: rgba(10, 4, 20, .75); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 20; }
+  .mcard { width: min(520px, 100%); max-height: 88vh; overflow-y: auto; background: var(--card); border: 3px solid var(--violet); border-radius: 14px; padding: 18px; }
+  .mcard h2 { font-family: "Press Start 2P", monospace; font-size: 14px; color: var(--pink); margin: 0 0 14px; line-height: 1.5; }
+  .mcard h3 { margin: 16px 0 6px; color: var(--violet); font-size: 15px; }
+  .mcard p { margin: 6px 0; }
+  .row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .row .btn { padding: 6px 12px; flex: none; }
+  .col { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
+  .note { background: #1c1030; border-left: 4px solid var(--pink); border-radius: 6px; padding: 10px 12px; margin: 8px 0; }
+  .note.locked { border-left-color: var(--line); color: var(--mute); }
+  input[type="text"], textarea {
+    width: 100%; background: #1c1030; color: var(--text); border: 2px solid var(--line); border-radius: 8px; padding: 8px 10px; font: inherit;
+  }
+  textarea { min-height: 84px; resize: vertical; word-break: break-all; }
+  .choose { display: flex; gap: 10px; }
+  .choose .btn { flex: 1; }
+  .choose .btn.sel { outline: 3px solid #fff; }
+  .cbar { position: relative; height: 34px; background: #1c1030; border: 2px solid var(--line); border-radius: 8px; margin: 14px 0; overflow: hidden; }
+  .czone { position: absolute; left: 40%; width: 20%; top: 0; bottom: 0; background: rgba(90, 220, 120, .55); }
+  .czone::before { content: ""; position: absolute; left: -20%; right: -20%; top: 0; bottom: 0; background: rgba(255, 210, 63, .25); z-index: -1; }
+  .cmark { position: absolute; top: 0; bottom: 0; width: 6px; margin-left: -3px; background: #fff; left: 50%; }
+  .cres { min-height: 24px; font-weight: 800; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hud">
+    <div class="title">Our Little Home</div>
+    <div class="stats">
+      <span class="pill" id="hearts">♥ 0</span>
+      <div class="bar" title="Pet hunger"><i id="hungerBar"></i><b>🍖</b></div>
+      <div class="bar" title="Pet happiness"><i id="happyBar"></i><b>💛</b></div>
+    </div>
+  </header>
+
+  <div class="screen">
+    <canvas id="game" width="480" height="320" aria-label="Our little home game"></canvas>
+    <div class="toast" id="toast"></div>
+  </div>
+
+  <div class="menu">
+    <button class="btn" id="bShop" type="button">Shop</button>
+    <button class="btn ghost" id="bBag" type="button">Bag</button>
+    <button class="btn ghost" id="bNotes" type="button">Notes <span class="badge" id="noteBadge" hidden>0</span></button>
+    <button class="btn ghost" id="bSave" type="button">Save</button>
+  </div>
+  <p class="hint" id="hint">Move: arrow keys or WASD. Interact: E or Space. Walk through the bottom door to reach the garden.</p>
+
+  <div class="pad" id="pad">
+    <div class="dpad">
+      <button class="u" data-dir="up" type="button">▲</button>
+      <button class="l" data-dir="left" type="button">◀</button>
+      <button class="r" data-dir="right" type="button">▶</button>
+      <button class="d" data-dir="down" type="button">▼</button>
+    </div>
+    <button class="abtn" id="aBtn" type="button">A</button>
+  </div>
+</div>
+
+<div class="overlay" id="modal" hidden><div class="mcard" id="mcard"></div></div>
+
+<script>
+(() => {
+'use strict';
+
+/* ---------- constants ---------- */
+const W = 480, H = 320;
+const MIN = 60e3, HOUR = 3600e3;
+const SAVE_KEY = 'ourLittleHome_v1';
+const WATER_MS = 5 * MIN;
+const DUST_MS = 2 * MIN;
+const MAX_DUST = 6;
+
+const CROPS = {
+  carrot: { name: 'Carrot', emoji: '🥕', grow: 4 * MIN,  seed: 2, ing: 1, hearts: 1,  color: '#ff8a3d' },
+  tomato: { name: 'Tomato', emoji: '🍅', grow: 10 * MIN, seed: 4, ing: 2, hearts: 1,  color: '#ff4a4a' },
+  flower: { name: 'Flower', emoji: '🌸', grow: 20 * MIN, seed: 6, ing: 0, hearts: 10, color: '#ff7fd0' }
+};
+
+// block = [x, y, w, h] in pixels (feet collision)
+const FURN = [
+  { id: 'rug',    name: 'Soft rug',      price: 15, block: null },
+  { id: 'plant',  name: 'House plant',   price: 10, block: [436, 112, 16, 16] },
+  { id: 'lamp',   name: 'Floor lamp',    price: 12, block: [128, 240, 10, 24] },
+  { id: 'couch',  name: 'Couch',         price: 20, block: [40, 232, 80, 28] },
+  { id: 'poster', name: 'Reyna poster',  price: 25, block: null },
+  { id: 'shelf',  name: 'Bookshelf',     price: 25, block: [20, 116, 28, 30] },
+  { id: 'petbed', name: 'Pet bed',       price: 18, block: null },
+  { id: 'bed',    name: 'Bed',           price: 30, block: [376, 50, 80, 54] },
+  { id: 'pc',     name: 'Gaming PC',     price: 40, block: [392, 150, 60, 30] },
+  { id: 'tv',     name: 'TV',            price: 50, block: [200, 46, 56, 8] }
+];
+
+// Kaiden's lines. EDIT THESE to say whatever you want.
+const LINES = [
+  'you look happy today', 'i love you ana', 'i made you this little home',
+  'come sit with me', 'gg my love', 'you are my favorite person in every lobby',
+  'cant wait to see you for real one day', 'i am always here with you',
+  'i think about you all day', 'you make every day better'
+];
+
+// Notes from Kaiden. EDIT THESE too.
+const NOTES = [
+  { id: 'n1', hint: 'Always unlocked', ok: () => true,
+    text: 'happy 3 year anniversary ana i made you this little home because i wanted to give you something even from far away i hope it makes you smile' },
+  { id: 'n2', hint: 'Clean 5 spots of dust', ok: s => s.stats.cleaned >= 5,
+    text: 'you keep the house so clean i would never do that without you' },
+  { id: 'n3', hint: 'Cook your first meal', ok: s => s.stats.cooked >= 1,
+    text: 'your cooking smells good even through the screen' },
+  { id: 'n4', hint: 'Harvest your first crop', ok: s => s.stats.harvested >= 1,
+    text: 'you grow everything so well just like you grew on me' },
+  { id: 'n5', hint: 'Feed your pet 5 times', ok: s => s.stats.fed >= 5,
+    text: 'i think our little pet already loves you more than me' },
+  { id: 'n6', hint: 'Earn 100 hearts in total', ok: s => s.stats.earned >= 100,
+    text: 'no matter how many hearts you collect in here you will always have mine' },
+  { id: 'n7', hint: 'Own 5 pieces of furniture', ok: s => Object.keys(s.owned).length >= 5,
+    text: 'a home is not the furniture its whoever is in it and i want to be there with you one day' },
+  { id: 'n8', hint: 'Spend time with Kaiden 10 times', ok: s => s.stats.together >= 10,
+    text: 'three years and i still smile every time i see your name pop up' }
+];
+
+/* ---------- state ---------- */
+function defaults() {
+  return {
+    v: 1, hearts: 10, petType: null, petName: '',
+    pet: { hunger: 80, happy: 80 },
+    seeds: { carrot: 2, tomato: 0, flower: 0 }, petfood: 2, ingredients: 2, meals: 0,
+    owned: {},
+    plots: Array.from({ length: 12 }, () => ({ crop: null, grow: 0, waterUntil: 0 })),
+    dust: [], dustAcc: 0,
+    lastTick: Date.now(),
+    notes: {}, seen: {}, cd: {},
+    stats: { cleaned: 0, cooked: 0, harvested: 0, fed: 0, earned: 0, together: 0 },
+    scene: 'house', x: 232, y: 260
+  };
+}
+function migrate(o) {
+  const d = defaults();
+  const s = Object.assign(d, o);
+  s.pet = Object.assign(defaults().pet, o.pet || {});
+  s.seeds = Object.assign(defaults().seeds, o.seeds || {});
+  s.stats = Object.assign(defaults().stats, o.stats || {});
+  s.owned = o.owned || {}; s.notes = o.notes || {}; s.seen = o.seen || {}; s.cd = o.cd || {};
+  s.dust = Array.isArray(o.dust) ? o.dust : [];
+  if (!Array.isArray(s.plots) || s.plots.length !== 12) s.plots = defaults().plots;
+  if (s.scene !== 'garden') s.scene = 'house';
+  return s;
+}
+let storageOk = true;
+function load() {
+  try { const raw = localStorage.getItem(SAVE_KEY); if (raw) return migrate(JSON.parse(raw)); }
+  catch (e) { storageOk = false; }
+  return null;
+}
+function save() {
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) { storageOk = false; }
+}
+let S = load() || defaults();
+let scene = S.scene;
+
+/* ---------- helpers ---------- */
+const cv = document.getElementById('game');
+const ctx = cv.getContext('2d');
+ctx.imageSmoothingEnabled = false;
+const $ = id => document.getElementById(id);
+function el(tag, attrs, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (k === 'class') e.className = v;
+    else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
+    else e.setAttribute(k, v);
+  }
+  for (const k of kids) if (k != null) e.append(k);
+  return e;
+}
+const R = (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(Math.round(x), Math.round(y), w, h); };
+const rand = (a, b) => a + Math.random() * (b - a);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const fmtMin = ms => Math.round(ms / MIN) + ' min';
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+/* ---------- world ---------- */
+const plotRects = [];
+for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) plotRects.push({ x: 152 + c * 48, y: 100 + r * 56, w: 32, h: 32 });
+
+const ana = { x: S.x, y: S.y, dir: 'down', moving: false, fr: 0 };
+const kai = { x: 250, y: 260, dir: 'down', moving: false, fr: 0, say: null, sayT: 0, nextSay: 8, stuck: 0 };
+const pet = { x: 210, y: 262, dir: 1, tx: 210, ty: 262, wait: 1, stuck: 0 };
+let floats = [];
+let modalOpen = false, onClose = null, cookStop = null;
+let nearest = null;
+const keys = { up: false, down: false, left: false, right: false };
+
+function blockers() {
+  if (scene !== 'house') return [];
+  const a = [[24, 44, 112, 22]];
+  for (const f of FURN) if (S.owned[f.id] && f.block) a.push(f.block);
+  return a;
+}
+const hit = (x, y, w, h, list) => list.some(b => x < b[0] + b[2] && x + w > b[0] && y < b[1] + b[3] && y + h > b[1]);
+
+function moveEnt(e, dx, dy, w, h, gap) {
+  const bl = blockers();
+  let nx = clamp(e.x + dx, 16, 464 - w);
+  if (!hit(nx, e.y, w, h, bl)) e.x = nx;
+  const inGap = gap && e.x >= 224 && e.x + w <= 256;
+  const minY = scene === 'garden' ? (inGap ? 36 : 48) : 44;
+  const maxY = scene === 'house' ? (inGap ? 312 : 296) : 296;
+  const ny = clamp(e.y + dy, minY, maxY);
+  if (!hit(e.x, ny, w, h, bl)) e.y = ny;
+}
+function unstick() {
+  const bl = blockers();
+  if (hit(ana.x, ana.y, 10, 8, bl)) { ana.x = 232; ana.y = 250; }
+  if (hit(kai.x, kai.y, 10, 8, bl)) { kai.x = 250; kai.y = 250; }
+  if (hit(pet.x, pet.y, 12, 6, bl)) { pet.x = 212; pet.y = 250; }
+}
+function goScene(s) {
+  scene = s; S.scene = s; floats = [];
+  ana.x = 232; ana.y = s === 'garden' ? 56 : 282;
+  kai.x = ana.x + 18; kai.y = ana.y;
+  pet.x = ana.x - 18; pet.y = ana.y; pet.tx = pet.x; pet.ty = pet.y;
+  save();
+}
+function spawnDust() {
+  const bl = blockers().concat([[24, 44, 112, 22]]);
+  const all = bl.concat(FURN.filter(f => f.block).map(f => f.block));
+  for (let i = 0; i < 25; i++) {
+    const x = rand(28, 440), y = rand(64, 286);
+    if (!hit(x - 6, y - 6, 12, 12, all)) { S.dust.push({ x: Math.round(x), y: Math.round(y) }); return; }
+  }
+}
+// decorative flowers in garden (fixed)
+const deco = []; { let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  while (deco.length < 34) { const x = 20 + rnd() * 440, y = 60 + rnd() * 240;
+    if (x > 140 && x < 340 && y > 90 && y < 290) continue; if (x > 218 && x < 262 && y < 100) continue;
+    deco.push({ x: Math.round(x), y: Math.round(y), c: ['#fff', '#ffd23f', '#ff9ec7', '#c9a7ff'][Math.floor(rnd() * 4)] }); } }
+
+/* ---------- time simulation (works while she is away) ---------- */
+function tick(now) {
+  let dt = now - S.lastTick;
+  if (dt <= 0) { S.lastTick = now; return; }
+  dt = Math.min(dt, 7 * 24 * HOUR);
+  for (const p of S.plots) {
+    if (!p.crop) continue;
+    const wet = Math.max(0, Math.min(now, p.waterUntil) - S.lastTick);
+    p.grow = Math.min(CROPS[p.crop].grow, p.grow + wet);
+  }
+  S.pet.hunger = Math.max(0, S.pet.hunger - dt * 100 / (8 * HOUR));
+  S.pet.happy = Math.max(0, S.pet.happy - dt * 100 / (10 * HOUR) * (S.pet.hunger < 20 ? 2 : 1));
+  S.dustAcc += dt;
+  while (S.dustAcc >= DUST_MS && S.dust.length < MAX_DUST) { spawnDust(); S.dustAcc -= DUST_MS; }
+  if (S.dust.length >= MAX_DUST) S.dustAcc = Math.min(S.dustAcc, DUST_MS);
+  S.lastTick = now;
+}
+
+/* ---------- gameplay actions ---------- */
+function addHearts(n, x, y) {
+  S.hearts += n; S.stats.earned += n;
+  floats.push({ x, y, text: '+' + n + ' ♥', t: 0, c: '#ff9ec7' });
+}
+function say(text, secs) { kai.say = text; kai.sayT = secs || 4; }
+function cleanDust(i) {
+  const d = S.dust[i]; if (!d) return;
+  S.dust.splice(i, 1); S.stats.cleaned++; addHearts(2, d.x, d.y - 8);
+}
+function together(id, n, line) {
+  const now = Date.now();
+  if (S.cd[id] && now < S.cd[id]) { say('later my love', 2.5); return; }
+  S.cd[id] = now + 90 * 1000; S.stats.together++; addHearts(n, kai.x, kai.y - 24); say(line, 4);
+}
+function harvest(p) {
+  const c = CROPS[p.crop];
+  if (c.ing) S.ingredients += c.ing;
+  addHearts(c.hearts, plotCenter(p).x, plotCenter(p).y - 14);
+  S.stats.harvested++;
+  toast(c.ing ? 'Harvested ' + c.name + '. +' + c.ing + ' ingredient' + (c.ing > 1 ? 's' : '') : 'Harvested a beautiful flower');
+  p.crop = null; p.grow = 0; p.waterUntil = 0;
+}
+const plotCenter = p => { const r = plotRects[S.plots.indexOf(p)]; return { x: r.x + 16, y: r.y + 16 }; };
+
+function closeModal() {
+  if (onClose) { onClose(); onClose = null; }
+  cookStop = null; $('modal').hidden = true; modalOpen = false;
+}
+function openModal(title, build, opts) {
+  opts = opts || {};
+  if (onClose) { onClose(); onClose = null; }
+  cookStop = null;
+  const card = $('mcard'); card.innerHTML = '';
+  card.append(el('h2', {}, title));
+  const body = el('div', {}); card.append(body);
+  build(body);
+  if (!opts.noClose) card.append(el('button', { class: 'btn ghost', type: 'button', style: 'margin-top:14px;width:100%', onclick: closeModal }, 'Close'));
+  onClose = opts.onClose || null;
+  $('modal').hidden = false; modalOpen = true;
+}
+function keepScroll(fn) { const st = $('mcard').scrollTop; fn(); $('mcard').scrollTop = st; }
+
+function openCook() {
+  if (S.ingredients < 1) { toast('No ingredients. Harvest some in the garden or buy one in the shop.'); return; }
+  let raf = 0, running = false, t0 = 0, pos = .5;
+  openModal('Kitchen', body => {
+    const res = el('p', { class: 'cres' }, '');
+    const mark = el('div', { class: 'cmark' });
+    const bar = el('div', { class: 'cbar' }, el('div', { class: 'czone' }), mark);
+    const go = el('button', { class: 'btn', type: 'button', style: 'width:100%' }, 'Start cooking');
+    const info = el('p', {}, '');
+    const refresh = () => { info.textContent = 'Stop the marker in the green zone. Uses 1 ingredient. You have ' + S.ingredients + '.'; };
+    refresh();
+    body.append(info, bar, res, go);
+    const loop = ts => { if (!running) return; pos = (Math.sin((ts - t0) / 260) + 1) / 2; mark.style.left = (pos * 100) + '%'; raf = requestAnimationFrame(loop); };
+    const stop = () => {
+      if (!running) return;
+      running = false; cancelAnimationFrame(raf);
+      S.ingredients--; const off = Math.abs(pos - .5);
+      if (off < .1) { S.meals++; S.stats.cooked++; addHearts(3, 80, 60); res.textContent = 'Perfect! A delicious meal. +3 hearts'; }
+      else if (off < .22) { S.meals++; S.stats.cooked++; res.textContent = 'Good! You made a meal.'; }
+      else res.textContent = 'Oops, it burned. Try again!';
+      refresh();
+      go.textContent = S.ingredients > 0 ? 'Cook again' : 'No ingredients left';
+      go.classList.toggle('off', S.ingredients < 1);
+      cookStop = null; save();
+    };
+    go.addEventListener('click', () => {
+      if (running) { stop(); return; }
+      if (S.ingredients < 1) return;
+      running = true; res.textContent = ''; go.textContent = 'Stop!'; t0 = performance.now(); cookStop = stop;
+      raf = requestAnimationFrame(loop);
+    });
+    onClose = () => { running = false; cancelAnimationFrame(raf); };
+  });
+}
+function openSeeds(p) {
+  openModal('Plant something', body => {
+    let any = false;
+    for (const [k, c] of Object.entries(CROPS)) {
+      const n = S.seeds[k];
+      any = any || n > 0;
+      body.append(el('div', { class: 'row' },
+        el('span', {}, c.emoji + ' ' + c.name + ' (' + n + ') - ready in ' + fmtMin(c.grow) + ' of watered time'),
+        el('button', { class: 'btn' + (n < 1 ? ' off' : ''), type: 'button', onclick: () => {
+          if (S.seeds[k] < 1) return;
+          S.seeds[k]--; p.crop = k; p.grow = 0; p.waterUntil = 0; closeModal();
+          toast('Planted! Now water it.'); save();
+        } }, 'Plant')));
+    }
+    if (!any) body.append(el('p', { class: 'hint' }, 'You have no seeds. Buy some in the shop.'));
+  });
+}
+function openPet() {
+  openModal(S.petName + ' the ' + S.petType, body => {
+    const info = el('p', {}, '');
+    const upd = () => { info.textContent = 'Hunger ' + Math.round(S.pet.hunger) + '%  |  Happy ' + Math.round(S.pet.happy) + '%'; };
+    upd();
+    const col = el('div', { class: 'col' });
+    const b1 = el('button', { class: 'btn' + (S.petfood < 1 ? ' off' : ''), type: 'button', onclick: () => {
+      if (S.petfood < 1) return; S.petfood--; S.pet.hunger = Math.min(100, S.pet.hunger + 35); S.pet.happy = Math.min(100, S.pet.happy + 3); S.stats.fed++;
+      toast(S.petName + ' ate happily'); save(); openPet(); } }, 'Give pet food (' + S.petfood + ')');
+    const b2 = el('button', { class: 'btn' + (S.meals < 1 ? ' off' : ''), type: 'button', onclick: () => {
+      if (S.meals < 1) return; S.meals--; S.pet.hunger = Math.min(100, S.pet.hunger + 60); S.pet.happy = Math.min(100, S.pet.happy + 10); S.stats.fed++;
+      toast(S.petName + ' loved your cooking'); save(); openPet(); } }, 'Give a cooked meal (' + S.meals + ')');
+    const b3 = el('button', { class: 'btn ghost', type: 'button', onclick: () => {
+      S.pet.happy = Math.min(100, S.pet.happy + 12); const now = Date.now();
+      if (!S.cd.pet || now > S.cd.pet) { S.cd.pet = now + 60000; addHearts(1, pet.x, pet.y - 16); }
+      toast(S.petName + ' loves the cuddles'); upd(); } }, 'Pet and play');
+    col.append(b1, b2, b3);
+    body.append(info, col);
+  });
+}
+function openKai() {
+  openModal('Kaiden', body => {
+    body.append(el('p', {}, 'He is always here with you.'));
+    const col = el('div', { class: 'col' });
+    col.append(
+      el('button', { class: 'btn' + (S.meals < 1 ? ' off' : ''), type: 'button', onclick: () => {
+        if (S.meals < 1) return; S.meals--; S.stats.together++; addHearts(6, kai.x, kai.y - 24); say('this is the best meal ever', 4); closeModal(); save(); } }, 'Share a meal (' + S.meals + ')'),
+      el('button', { class: 'btn', type: 'button', onclick: () => {
+        const now = Date.now();
+        if (S.cd.hug && now < S.cd.hug) { toast('Kaiden: one hug every minute, but i will hug you forever'); return; }
+        S.cd.hug = now + 60000; S.stats.together++; addHearts(2, kai.x, kai.y - 24); say('best hug ever', 3); closeModal(); save(); } }, 'Give a hug'),
+      el('button', { class: 'btn ghost', type: 'button', onclick: () => { say(LINES[Math.floor(Math.random() * LINES.length)], 4); closeModal(); } }, 'Talk')
+    );
+    body.append(col);
+  });
+}
+function openShop() {
+  openModal('Shop', body => {
+    body.append(el('p', {}, 'You have ♥ ' + S.hearts));
+    const section = (title, items) => {
+      body.append(el('h3', {}, title));
+      for (const it of items) {
+        const off = it.owned || S.hearts < it.price;
+        body.append(el('div', { class: 'row' }, el('span', {}, it.name),
+          el('button', { class: 'btn' + (off ? ' off' : ''), type: 'button', onclick: () => {
+            if (it.owned || S.hearts < it.price) return;
+            S.hearts -= it.price; it.buy(); unstick(); save(); toast('Bought ' + it.label);
+            keepScroll(openShop);
+          } }, it.owned ? 'Owned' : '♥ ' + it.price)));
+      }
+    };
+    section('Seeds', Object.entries(CROPS).map(([k, c]) => ({
+      name: c.emoji + ' ' + c.name + ' seed (you have ' + S.seeds[k] + ')', label: c.name + ' seed', price: c.seed, buy() { S.seeds[k]++; } })));
+    section('Supplies', [
+      { name: '🍖 Pet food (you have ' + S.petfood + ')', label: 'pet food', price: 2, buy() { S.petfood++; } },
+      { name: '🥣 Ingredient (you have ' + S.ingredients + ')', label: 'an ingredient', price: 3, buy() { S.ingredients++; } }]);
+    section('Furniture', FURN.map(f => ({ name: f.name, label: f.name, price: f.price, owned: !!S.owned[f.id], buy() { S.owned[f.id] = true; } })));
+  });
+}
+function openBag() {
+  openModal('Bag', body => {
+    const line = t => body.append(el('div', { class: 'row' }, el('span', {}, t)));
+    line('♥ Hearts: ' + S.hearts);
+    for (const [k, c] of Object.entries(CROPS)) line(c.emoji + ' ' + c.name + ' seeds: ' + S.seeds[k]);
+    line('🥣 Ingredients: ' + S.ingredients);
+    line('🍲 Cooked meals: ' + S.meals);
+    line('🍖 Pet food: ' + S.petfood);
+    line('🛋 Furniture owned: ' + Object.keys(S.owned).length + ' / ' + FURN.length);
+  });
+}
+function openNotes() {
+  for (const n of NOTES) if (S.notes[n.id]) S.seen[n.id] = true;
+  updateBadge();
+  openModal('Notes from Kaiden', body => {
+    for (const n of NOTES) {
+      body.append(S.notes[n.id]
+        ? el('div', { class: 'note' }, n.text)
+        : el('div', { class: 'note locked' }, 'Locked: ' + n.hint));
+    }
+  });
+}
+function openSave() {
+  openModal('Save', body => {
+    body.append(el('p', {}, 'Your game saves automatically on this device. To play on another device, copy this save code and paste it there.'));
+    const code = btoa(unescape(encodeURIComponent(JSON.stringify(S))));
+    const ta = el('textarea', { readonly: 'readonly' }); ta.value = code;
+    body.append(ta,
+      el('button', { class: 'btn', type: 'button', style: 'margin-top:8px', onclick: () => {
+        ta.select(); try { navigator.clipboard.writeText(code); toast('Save code copied'); } catch (e) { document.execCommand('copy'); toast('Copied'); } } }, 'Copy code'));
+    body.append(el('h3', {}, 'Load a save code'));
+    const inp = el('textarea', { placeholder: 'Paste your save code here' });
+    body.append(inp, el('button', { class: 'btn ghost', type: 'button', style: 'margin-top:8px', onclick: () => {
+      try {
+        const o = JSON.parse(decodeURIComponent(escape(atob(inp.value.trim()))));
+        if (typeof o.hearts !== 'number' || !o.plots) throw new Error('bad');
+        S = migrate(o); S.lastTick = Date.now(); scene = S.scene; save(); location.reload();
+      } catch (e) { toast('That save code did not work'); } } }, 'Load'));
+    if (!storageOk) body.append(el('p', { class: 'hint' }, 'This browser is blocking saving. Use the save code to keep your progress.'));
+  });
+}
+function openStart() {
+  let type = 'cat';
+  openModal('Welcome home, Ana', body => {
+    body.append(el('p', {}, 'Kaiden made you a little home. Clean it, cook, grow a garden, decorate, and adopt a pet. Time keeps going even when you are away.'));
+    body.append(el('h3', {}, 'Adopt a pet'));
+    const cat = el('button', { class: 'btn sel', type: 'button' }, '🐱 Cat');
+    const dog = el('button', { class: 'btn ghost', type: 'button' }, '🐶 Dog');
+    cat.addEventListener('click', () => { type = 'cat'; cat.className = 'btn sel'; dog.className = 'btn ghost'; });
+    dog.addEventListener('click', () => { type = 'dog'; dog.className = 'btn sel'; cat.className = 'btn ghost'; });
+    body.append(el('div', { class: 'choose' }, cat, dog));
+    body.append(el('h3', {}, 'Name your pet'));
+    const name = el('input', { type: 'text', maxlength: '14', value: 'Mochi' });
+    body.append(name, el('button', { class: 'btn', type: 'button', style: 'margin-top:14px;width:100%', onclick: () => {
+      S.petType = type; S.petName = (name.value || 'Mochi').trim().slice(0, 14) || 'Mochi';
+      pet.x = 212; pet.y = 262; closeModal(); save(); toast('Welcome home, ' + S.petName + '!'); } }, 'Start'));
+  }, { noClose: true });
+}
+
+/* ---------- interactions ---------- */
+function computeNearest() {
+  const fx = ana.x + 5, fy = ana.y + 4, list = [];
+  if (scene === 'house') {
+    S.dust.forEach((d, i) => list.push({ label: 'Clean', x: d.x, y: d.y, r: 18, act: () => cleanDust(i) }));
+    list.push({ label: 'Cook', x: 80, y: 74, r: 30, act: openCook });
+    if (S.owned.couch) list.push({ label: 'Sit with Kaiden', x: 80, y: 266, r: 34, act: () => together('couch', 2, 'this is my favorite spot with you') });
+    if (S.owned.pc) list.push({ label: 'Play with Kaiden', x: 422, y: 190, r: 32, act: () => together('pc', 2, 'one more game with you') });
+    if (S.owned.tv) list.push({ label: 'Watch TV with Kaiden', x: 228, y: 66, r: 34, act: () => together('tv', 2, 'movie night with you') });
+  } else {
+    S.plots.forEach((p, i) => {
+      const r = plotRects[i], now = Date.now();
+      let label, act;
+      if (!p.crop) { label = 'Plant'; act = () => openSeeds(p); }
+      else if (p.grow >= CROPS[p.crop].grow) { label = 'Harvest'; act = () => harvest(p); }
+      else { label = 'Water'; act = () => {
+        if (p.waterUntil - now > WATER_MS * .6) { toast('Still wet. Come back in a bit.'); return; }
+        p.waterUntil = now + WATER_MS; toast('Watered'); }; }
+      list.push({ label, x: r.x + 16, y: r.y + 16, r: 28, act });
+    });
+  }
+  if (S.petType) list.push({ label: 'Pet ' + S.petName, x: pet.x + 6, y: pet.y, r: 22, act: openPet });
+  list.push({ label: 'Talk to Kaiden', x: kai.x + 5, y: kai.y, r: 24, act: openKai });
+  let best = null, bs = 1;
+  for (const it of list) { const d = Math.hypot(fx - it.x, fy - it.y) / it.r; if (d < bs) { bs = d; best = it; } }
+  nearest = best;
+}
+function interact() {
+  if (modalOpen) return;
+  if (nearest) { nearest.act(); save(); }
+}
+
+/* ---------- update ---------- */
+let lastTs = 0, sinceSave = 0, sinceHud = 0;
+function update(dt, now) {
+  tick(now);
+  if (!modalOpen) {
+    let dx = (keys.right ? 1 : 0) - (keys.left ? 1 : 0), dy = (keys.down ? 1 : 0) - (keys.up ? 1 : 0);
+    ana.moving = dx || dy;
+    if (ana.moving) {
+      const l = Math.hypot(dx, dy); const sp = 70 * dt;
+      moveEnt(ana, dx / l * sp, dy / l * sp, 10, 8, true);
+      ana.dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
+      ana.fr += dt * 9;
+    }
+    if (scene === 'house' && ana.y >= 302 && ana.x >= 224 && ana.x + 10 <= 256) goScene('garden');
+    else if (scene === 'garden' && ana.y <= 40 && ana.x >= 224 && ana.x + 10 <= 256) goScene('house');
+  }
+  // Kaiden follows
+  const dk = Math.hypot(ana.x + 22 - kai.x, ana.y - kai.y);
+  kai.moving = false;
+  if (dk > 30) {
+    const sp = 52 * dt, bx = kai.x, by = kai.y;
+    moveEnt(kai, (ana.x + 22 - kai.x) / dk * sp, (ana.y - kai.y) / dk * sp, 10, 8, false);
+    kai.moving = true; kai.fr += dt * 8;
+    const ddx = ana.x - kai.x; kai.dir = Math.abs(ddx) > Math.abs(ana.y - kai.y) ? (ddx > 0 ? 'right' : 'left') : (ana.y > kai.y ? 'down' : 'up');
+    if (Math.hypot(kai.x - bx, kai.y - by) < sp * .2) kai.stuck += dt; else kai.stuck = 0;
+    if (kai.stuck > 1.5 || dk > 150) { kai.x = ana.x + 18; kai.y = ana.y; kai.stuck = 0; }
+  }
+  // Kaiden talks
+  if (kai.sayT > 0) { kai.sayT -= dt; if (kai.sayT <= 0) kai.say = null; }
+  kai.nextSay -= dt;
+  if (kai.nextSay <= 0 && !modalOpen) {
+    let line = LINES[Math.floor(Math.random() * LINES.length)];
+    if (S.petType && S.pet.hunger < 30) line = 'i think ' + S.petName.toLowerCase() + ' is hungry';
+    else if (scene === 'house' && S.dust.length >= 4) line = 'the house is getting a little dusty';
+    else if (S.plots.some(p => p.crop && p.grow >= CROPS[p.crop].grow)) line = 'something in the garden is ready';
+    say(line, 4); kai.nextSay = rand(20, 34);
+  }
+  // pet wanders
+  if (S.petType) {
+    pet.wait -= dt;
+    const dp = Math.hypot(pet.tx - pet.x, pet.ty - pet.y);
+    if (dp > 3) {
+      const sp = 30 * dt, bx = pet.x, by = pet.y;
+      moveEnt(pet, (pet.tx - pet.x) / dp * sp, (pet.ty - pet.y) / dp * sp, 12, 6, false);
+      pet.dir = pet.tx > pet.x ? 1 : -1;
+      if (Math.hypot(pet.x - bx, pet.y - by) < sp * .2) pet.stuck += dt; else pet.stuck = 0;
+      if (pet.stuck > .8) { pet.wait = 0; pet.tx = pet.x; pet.ty = pet.y; pet.stuck = 0; }
+    } else if (pet.wait <= 0) {
+      if (Math.random() < .6) { pet.tx = clamp(ana.x + rand(-55, 55), 20, 440); pet.ty = clamp(ana.y + rand(-30, 30), 52, 290); }
+      else { pet.tx = rand(24, 440); pet.ty = rand(60, 290); }
+      pet.wait = rand(1.5, 4);
+    }
+  }
+  computeNearest();
+  // floats
+  for (const f of floats) { f.t += dt; f.y -= 14 * dt; }
+  floats = floats.filter(f => f.t < 1.4);
+  // notes
+  for (const n of NOTES) if (!S.notes[n.id] && n.ok(S)) { S.notes[n.id] = true; if (n.id !== 'n1') toast('New note from Kaiden!'); updateBadge(); }
+  // hud + save
+  sinceHud += dt; if (sinceHud > .25) { sinceHud = 0; updateHud(); }
+  sinceSave += dt; if (sinceSave > 8) { sinceSave = 0; S.x = ana.x; S.y = ana.y; save(); }
+}
+function updateHud() {
+  $('hearts').textContent = '♥ ' + S.hearts;
+  $('hungerBar').style.width = Math.round(S.pet.hunger) + '%';
+  $('happyBar').style.width = Math.round(S.pet.happy) + '%';
+}
+function updateBadge() {
+  const n = NOTES.filter(x => S.notes[x.id] && !S.seen[x.id]).length;
+  $('noteBadge').hidden = n === 0; $('noteBadge').textContent = n;
+}
+
+/* ---------- drawing ---------- */
+function person(x, y, dir, fr, moving, c) {
+  const bx = x - 2, by = y - 14, step = moving ? (Math.floor(fr) % 2) : 0;
+  R(bx + 1, y + 6, 12, 3, 'rgba(0,0,0,.18)');
+  R(bx + 1, by, 12, 12, c.hair);
+  if (c.long) { R(bx, by + 4, 2, 12, c.hair); R(bx + 12, by + 4, 2, 12, c.hair); }
+  if (dir !== 'up') {
+    R(bx + 2, by + 3, 10, 9, c.skin);
+    R(bx + 1, by, 12, 4, c.hair);
+    const ey = by + 7;
+    if (dir === 'down') { R(bx + 4, ey, 2, 2, '#222'); R(bx + 8, ey, 2, 2, '#222'); }
+    else if (dir === 'left') { R(bx + 3, ey, 2, 2, '#222'); R(bx + 7, ey, 2, 2, '#222'); }
+    else { R(bx + 7, ey, 2, 2, '#222'); R(bx + 11, ey, 2, 2, '#222'); }
+  }
+  R(bx + 2, by + 12, 10, 7, c.top);
+  R(bx, by + 12, 2, 6, c.top); R(bx + 12, by + 12, 2, 6, c.top);
+  R(bx, by + 17, 2, 2, c.skin); R(bx + 12, by + 17, 2, 2, c.skin);
+  R(bx + 3, by + 19, 3, 3 - step, c.pants); R(bx + 8, by + 19, 3, 2 + step, c.pants);
+}
+const ANA = { hair: '#7a3fb0', skin: '#f3c7a1', top: '#ff6fa8', pants: '#3b2a6b', long: true };
+const KAI = { hair: '#231a2e', skin: '#e0b088', top: '#2fb6a3', pants: '#2b2f4a', long: false };
+
+function drawPet() {
+  const x = pet.x, y = pet.y, d = pet.dir, cat = S.petType === 'cat';
+  const col = cat ? '#f2a65a' : '#b9814a', dark = cat ? '#c97d2e' : '#8a5a2b';
+  R(x, y + 2, 12, 3, 'rgba(0,0,0,.18)');
+  R(x, y - 5, 12, 9, col);
+  const hx = d > 0 ? x + 8 : x - 4;
+  R(hx, y - 9, 8, 8, col);
+  if (cat) { R(hx, y - 12, 2, 3, col); R(hx + 6, y - 12, 2, 3, col); R(d > 0 ? x - 4 : x + 12, y - 8, 4, 2, col); R(d > 0 ? x - 4 : x + 12, y - 10, 2, 2, col); }
+  else { R(hx - 1, y - 9, 3, 6, dark); R(hx + 6, y - 9, 3, 6, dark); R(d > 0 ? hx + 6 : hx - 1, y - 5, 3, 3, '#6b4423'); R(d > 0 ? x - 3 : x + 12, y - 6, 3, 2, col); }
+  R(d > 0 ? hx + 5 : hx + 1, y - 7, 1, 2, '#222');
+  R(x + 1, y + 3, 2, 3, dark); R(x + 9, y + 3, 2, 3, dark);
+  if (S.pet.hunger < 25 || S.pet.happy < 20) { ctx.fillStyle = '#ff4a4a'; ctx.font = 'bold 11px sans-serif'; ctx.fillText('!', x + 4, y - 16); }
+  else if (S.pet.happy > 85 && Math.floor(performance.now() / 1200) % 3 === 0) { ctx.fillStyle = '#ff6fa8'; ctx.font = 'bold 10px sans-serif'; ctx.fillText('♥', x + 3, y - 14); }
+}
+
+function drawFurn(id) {
+  switch (id) {
+    case 'rug': R(180, 150, 120, 70, '#e0407f'); R(186, 156, 108, 58, '#ffb3d0'); R(196, 166, 88, 38, '#ff8fbd'); break;
+    case 'plant': R(438, 122, 12, 8, '#c0704a'); R(440, 110, 8, 12, '#4fa85a'); R(436, 114, 6, 6, '#3f8f4a'); R(446, 113, 6, 6, '#3f8f4a'); break;
+    case 'lamp': R(132, 246, 2, 18, '#555'); R(128, 236, 10, 11, '#ffe9a6'); R(129, 262, 8, 3, '#444'); break;
+    case 'couch': R(40, 232, 80, 28, '#6b4bc4'); R(40, 232, 80, 10, '#5637a8'); R(40, 238, 10, 22, '#5637a8'); R(110, 238, 10, 22, '#5637a8');
+      R(52, 244, 28, 14, '#8a6af0'); R(82, 244, 26, 14, '#8a6af0'); break;
+    case 'poster': R(300, 12, 36, 44, '#2b1150'); R(302, 14, 32, 40, '#5b1f9c'); R(308, 28, 20, 12, '#ff3d8b'); R(314, 30, 8, 8, '#fff'); R(317, 32, 3, 4, '#2b1150'); R(306, 44, 24, 3, '#ff3d8b'); break;
+    case 'shelf': R(20, 108, 28, 42, '#8b5a36'); R(22, 110, 24, 38, '#5d3a1e');
+      ['#ff6fa8', '#a66bff', '#ffd23f', '#2fb6a3'].forEach((c, i) => { R(24 + i * 5, 113, 4, 10, c); R(24 + i * 5, 128, 4, 10, c); }); R(22, 125, 24, 2, '#8b5a36'); break;
+    case 'petbed': R(170, 262, 34, 20, '#e85a8c'); R(174, 265, 26, 14, '#ffc2d8'); break;
+    case 'bed': R(376, 48, 80, 56, '#8b5a36'); R(380, 52, 72, 48, '#ffd6e7'); R(380, 70, 72, 30, '#a66bff'); R(384, 56, 24, 14, '#fff'); R(412, 56, 24, 14, '#fff'); break;
+    case 'pc': R(392, 150, 60, 24, '#a0703f'); R(406, 134, 32, 20, '#1a1a2e'); R(408, 136, 28, 14, '#8a2be2'); R(418, 140, 8, 6, '#ff3d8b'); R(420, 142, 4, 2, '#fff'); R(419, 154, 6, 3, '#333'); R(410, 162, 24, 5, '#333'); R(414, 176, 16, 10, '#ff6fa8'); break;
+    case 'tv': R(200, 22, 56, 32, '#111'); R(203, 25, 50, 24, '#3a5bd9'); R(206, 28, 18, 6, 'rgba(255,255,255,.35)'); R(222, 54, 12, 4, '#222'); break;
+  }
+}
+function drawHouse() {
+  R(0, 0, W, H, '#dcb482');
+  R(0, 0, W, 48, '#d9c6f2'); R(0, 40, W, 8, '#b99ad9');
+  for (let y = 48, row = 0; y < 304; y += 16, row++) {
+    R(16, y, 448, 16, row % 2 ? '#dcb482' : '#e6c08f');
+    for (let x = 16 + (row % 2) * 24; x < 464; x += 48) R(x, y, 1, 16, '#c79c6c');
+  }
+  R(0, 0, 16, H, '#b99ad9'); R(464, 0, 16, H, '#b99ad9'); R(0, 304, W, 16, '#7d5bb0');
+  R(224, 304, 32, 16, '#3a2358'); R(226, 296, 28, 8, '#ff6fa8');
+  // window
+  R(150, 8, 44, 34, '#fff3ff'); R(154, 12, 36, 26, '#8fd3ff'); R(171, 12, 2, 26, '#fff'); R(154, 24, 36, 2, '#fff');
+  // kitchen
+  R(24, 24, 112, 16, '#f6e9ff'); R(24, 38, 112, 26, '#b48be6'); R(24, 38, 112, 4, '#e7d2ff');
+  R(40, 40, 28, 20, '#44335e'); R(45, 44, 9, 6, '#8a7aa8'); R(57, 44, 9, 6, '#8a7aa8'); R(48, 34, 12, 8, '#ddd'); R(46, 32, 16, 3, '#bbb');
+  R(84, 42, 26, 14, '#cfe8ff'); R(94, 36, 4, 6, '#aaa');
+  for (const f of FURN) if (S.owned[f.id]) drawFurn(f.id);
+}
+function drawGarden() {
+  R(0, 0, W, H, '#7cc06a');
+  for (let i = 0; i < 90; i++) { const x = (i * 97) % 470, y = 52 + (i * 53) % 250; R(x, y, 2, 2, '#6bb25a'); }
+  R(0, 0, W, 48, '#d9c6f2'); R(0, 40, W, 8, '#b99ad9'); R(0, 0, W, 8, '#7d5bb0');
+  R(224, 14, 32, 34, '#8b5a36'); R(228, 18, 24, 30, '#a0703f'); R(246, 32, 3, 3, '#ffd23f');
+  R(112, 14, 44, 26, '#fff3ff'); R(116, 18, 36, 18, '#8fd3ff'); R(324, 14, 44, 26, '#fff3ff'); R(328, 18, 36, 18, '#8fd3ff');
+  R(224, 48, 32, 48, '#e3d3a1');
+  for (const d of deco) { R(d.x, d.y, 3, 3, d.c); R(d.x + 1, d.y + 3, 1, 3, '#4fa85a'); }
+  for (let x = 0; x < W; x += 12) { R(x, 308, 4, 12, '#b98a5a'); }
+  R(0, 312, W, 3, '#b98a5a');
+  for (let y = 56; y < 308; y += 12) { R(0, y, 4, 8, '#b98a5a'); R(476, y, 4, 8, '#b98a5a'); }
+  const now = Date.now();
+  S.plots.forEach((p, i) => {
+    const r = plotRects[i], wet = p.waterUntil > now;
+    R(r.x - 2, r.y - 2, 36, 36, '#5a3a20'); R(r.x, r.y, 32, 32, wet ? '#4e3320' : '#8a6a45');
+    if (wet) { R(r.x + 4, r.y + 6, 3, 1, '#7aaed6'); R(r.x + 20, r.y + 22, 3, 1, '#7aaed6'); }
+    if (!p.crop) return;
+    const c = CROPS[p.crop], f = p.grow / c.grow, cx = r.x + 16, cy = r.y + 16;
+    if (f < .34) { R(cx - 1, cy + 2, 2, 8, '#4fa85a'); R(cx - 5, cy, 5, 3, '#6ed078'); R(cx + 1, cy - 1, 5, 3, '#6ed078'); }
+    else if (f < .67) { R(cx - 1, cy - 4, 2, 14, '#4fa85a'); R(cx - 7, cy - 2, 7, 4, '#6ed078'); R(cx + 1, cy - 4, 7, 4, '#6ed078'); R(cx - 5, cy + 3, 5, 3, '#6ed078'); }
+    else if (f < 1) { R(cx - 1, cy - 8, 2, 18, '#4fa85a'); R(cx - 9, cy - 4, 9, 5, '#58bf66'); R(cx + 1, cy - 6, 9, 5, '#58bf66'); R(cx - 7, cy + 3, 7, 4, '#58bf66'); R(cx + 2, cy + 4, 6, 4, '#58bf66'); }
+    else {
+      R(cx - 1, cy - 8, 2, 18, '#4fa85a'); R(cx - 9, cy - 2, 9, 5, '#58bf66'); R(cx + 1, cy - 4, 9, 5, '#58bf66');
+      if (p.crop === 'carrot') { R(cx - 4, cy + 4, 8, 8, c.color); R(cx - 2, cy + 12, 4, 3, c.color); }
+      else if (p.crop === 'tomato') { R(cx - 8, cy, 6, 6, c.color); R(cx + 3, cy + 2, 6, 6, c.color); R(cx - 2, cy - 8, 6, 6, c.color); }
+      else { R(cx - 6, cy - 12, 12, 12, c.color); R(cx - 2, cy - 8, 4, 4, '#ffd23f'); R(cx - 9, cy - 9, 4, 6, c.color); R(cx + 5, cy - 9, 4, 6, c.color); }
+      if (Math.floor(performance.now() / 400) % 2) { R(r.x + 2, r.y + 2, 3, 3, '#fff6a8'); R(r.x + 26, r.y + 4, 2, 2, '#fff6a8'); }
+    }
+  });
+}
+function drawDust() {
+  for (const d of S.dust) { R(d.x - 6, d.y - 2, 12, 5, 'rgba(120,110,130,.55)'); R(d.x - 3, d.y - 5, 7, 5, 'rgba(150,140,160,.6)'); R(d.x + 2, d.y - 7, 3, 3, 'rgba(255,255,255,.7)'); }
+}
+function wrapText(t, maxW) {
+  const words = t.split(' '), lines = []; let cur = '';
+  for (const w of words) { const test = cur ? cur + ' ' + w : w; if (ctx.measureText(test).width > maxW && cur) { lines.push(cur); cur = w; } else cur = test; }
+  lines.push(cur); return lines;
+}
+function drawBubble(text, cx, cy) {
+  ctx.font = 'bold 9px "Nunito", sans-serif';
+  const lines = wrapText(text, 110), w = Math.max(...lines.map(l => ctx.measureText(l).width)) + 10, h = lines.length * 11 + 6;
+  const x = clamp(cx - w / 2, 4, W - w - 4), y = Math.max(4, cy - h);
+  R(x, y, w, h, '#fff'); R(x + 1, y - 1, w - 2, 1, '#fff'); R(x + 1, y + h, w - 2, 1, '#fff');
+  R(clamp(cx - 2, x + 4, x + w - 8), y + h, 4, 3, '#fff');
+  ctx.fillStyle = '#2b1150'; lines.forEach((l, i) => ctx.fillText(l, x + 5, y + 11 + i * 11 - 1));
+}
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+  if (scene === 'house') drawHouse(); else drawGarden();
+  if (scene === 'house') drawDust();
+  const ents = [
+    { y: ana.y, d: () => person(ana.x, ana.y, ana.dir, ana.fr, ana.moving, ANA) },
+    { y: kai.y, d: () => person(kai.x, kai.y, kai.dir, kai.fr, kai.moving, KAI) }
+  ];
+  if (S.petType) ents.push({ y: pet.y, d: drawPet });
+  ents.sort((a, b) => a.y - b.y).forEach(e => e.d());
+  if (kai.say) drawBubble(kai.say, kai.x + 5, kai.y - 18);
+  for (const f of floats) { ctx.globalAlpha = Math.max(0, 1 - f.t / 1.4); ctx.fillStyle = f.c; ctx.font = 'bold 10px sans-serif'; ctx.fillText(f.text, f.x - 10, f.y); ctx.globalAlpha = 1; }
+  if (nearest && !modalOpen) {
+    ctx.font = 'bold 10px "Nunito", sans-serif';
+    const key = matchMedia('(pointer:coarse)').matches ? 'A' : 'E';
+    const t = '[' + key + '] ' + nearest.label, w = ctx.measureText(t).width + 14;
+    R(W / 2 - w / 2, 298, w, 16, 'rgba(20,8,36,.88)'); R(W / 2 - w / 2, 298, w, 1, '#ff6fa8'); R(W / 2 - w / 2, 313, w, 1, '#ff6fa8');
+    ctx.fillStyle = '#fff'; ctx.fillText(t, W / 2 - w / 2 + 7, 309);
+  }
+}
+
+/* ---------- input ---------- */
+const KEYMAP = { ArrowUp: 'up', w: 'up', W: 'up', ArrowDown: 'down', s: 'down', S: 'down', ArrowLeft: 'left', a: 'left', A: 'left', ArrowRight: 'right', d: 'right', D: 'right' };
+addEventListener('keydown', e => {
+  if (modalOpen) {
+    if (e.key === ' ' && cookStop) { e.preventDefault(); cookStop(); }
+    else if (e.key === 'Escape' && $('mcard').querySelector('.btn.ghost[style*="margin-top:14px"]')) closeModal();
+    return;
+  }
+  if (KEYMAP[e.key]) { keys[KEYMAP[e.key]] = true; e.preventDefault(); }
+  else if (e.key === 'e' || e.key === 'E' || e.key === ' ' || e.key === 'Enter') { e.preventDefault(); interact(); }
+});
+addEventListener('keyup', e => { if (KEYMAP[e.key]) keys[KEYMAP[e.key]] = false; });
+addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
+document.querySelectorAll('.dpad button').forEach(b => {
+  const d = b.dataset.dir;
+  b.addEventListener('pointerdown', e => { e.preventDefault(); keys[d] = true; });
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => b.addEventListener(ev, () => { keys[d] = false; }));
+});
+$('aBtn').addEventListener('pointerdown', e => { e.preventDefault(); interact(); });
+$('bShop').addEventListener('click', openShop);
+$('bBag').addEventListener('click', openBag);
+$('bNotes').addEventListener('click', openNotes);
+$('bSave').addEventListener('click', openSave);
+$('modal').addEventListener('click', e => { if (e.target === $('modal') && $('mcard').querySelector('.btn.ghost[style*="margin-top:14px"]')) closeModal(); });
+if (matchMedia('(pointer:coarse)').matches) {
+  $('pad').classList.add('on');
+  $('hint').textContent = 'Use the pad to move and A to interact. Walk through the bottom door to reach the garden.';
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden) { S.x = ana.x; S.y = ana.y; save(); } });
+addEventListener('beforeunload', () => { S.x = ana.x; S.y = ana.y; save(); });
+
+/* ---------- start ---------- */
+function frame(ts) {
+  const dt = Math.min(.05, (ts - lastTs) / 1000 || 0); lastTs = ts;
+  update(dt, Date.now()); draw();
+  requestAnimationFrame(frame);
+}
+ana.x = S.x; ana.y = S.y; kai.x = ana.x + 20; kai.y = ana.y; pet.x = ana.x - 20; pet.y = ana.y; pet.tx = pet.x; pet.ty = pet.y;
+unstick();
+updateHud(); updateBadge();
+if (!S.petType) openStart();
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
